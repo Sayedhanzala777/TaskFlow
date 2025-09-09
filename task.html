@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaskFlow - Task Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen text-gray-900 dark:text-gray-100 transition">
+
+  <nav class="flex justify-between items-center px-6 py-4 bg-white dark:bg-gray-800 shadow-md">
+    <h1 class="text-2xl font-bold">⚡ TaskFlow</h1>
+    <button id="themeToggle" class="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition">
+      Toggle Dark Mode
+    </button>
+  </nav>
+
+  <div class="max-w-4xl mx-auto mt-8 p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-lg">
+    <form id="taskForm" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <input type="text" id="title" placeholder="Task Title" required class="p-3 rounded-lg border dark:bg-gray-700 dark:border-gray-600" />
+      <input type="date" id="dueDate" required class="p-3 rounded-lg border dark:bg-gray-700 dark:border-gray-600" />
+      <select id="category" class="p-3 rounded-lg border dark:bg-gray-700 dark:border-gray-600">
+        <option value="Work">Work</option>
+        <option value="Personal">Personal</option>
+        <option value="Urgent">Urgent</option>
+      </select>
+      <select id="priority" class="p-3 rounded-lg border dark:bg-gray-700 dark:border-gray-600">
+        <option value="Low">Low</option>
+        <option value="Medium">Medium</option>
+        <option value="High">High</option>
+      </select>
+      <button type="submit" class="md:col-span-2 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition">
+        ➕ Add Task
+      </button>
+    </form>
+
+    <div class="flex gap-2 mb-6">
+      <button class="filterBtn px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-lg" data-filter="all">All</button>
+      <button class="filterBtn px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-lg" data-filter="active">Active</button>
+      <button class="filterBtn px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-lg" data-filter="completed">Completed</button>
+    </div>
+
+    <div class="mb-6">
+      <div class="w-full bg-gray-300 dark:bg-gray-700 rounded-full h-4">
+        <div id="progressBar" class="bg-green-500 h-4 rounded-full transition-all"></div>
+      </div>
+      <p id="progressText" class="mt-2 text-sm"></p>
+    </div>
+
+    <div id="taskList" class="space-y-4"></div>
+    <p id="emptyState" class="text-center text-gray-500 dark:text-gray-400">No tasks yet 🚀</p>
+  </div>
+
+  <script>
+    $(document).ready(function () {
+      let tasks = JSON.parse(localStorage.getItem("tasks")) || [];
+      let darkMode = localStorage.getItem("darkMode") === "true";
+      if (darkMode) $("html").addClass("dark");
+
+      $("#themeToggle").click(function () {
+        $("html").toggleClass("dark");
+        darkMode = $("html").hasClass("dark");
+        localStorage.setItem("darkMode", darkMode);
+      });
+
+      $("#taskForm").submit(function (e) {
+        e.preventDefault();
+        const task = {
+          id: Date.now(),
+          title: $("#title").val(),
+          category: $("#category").val(),
+          priority: $("#priority").val(),
+          dueDate: $("#dueDate").val(),
+          completed: false
+        };
+        tasks.push(task);
+        saveTasks();
+        renderTasks();
+        this.reset();
+      });
+
+      function saveTasks() {
+        localStorage.setItem("tasks", JSON.stringify(tasks));
+      }
+
+      function renderTasks(filter = "all") {
+        $("#taskList").empty();
+        let filtered = tasks;
+        if (filter === "active") filtered = tasks.filter(t => !t.completed);
+        if (filter === "completed") filtered = tasks.filter(t => t.completed);
+
+        if (filtered.length === 0) {
+          $("#emptyState").show();
+        } else {
+          $("#emptyState").hide();
+          filtered.forEach(task => {
+            const badgeColors = {
+              Work: "bg-blue-100 text-blue-600",
+              Personal: "bg-purple-100 text-purple-600",
+              Urgent: "bg-red-100 text-red-600"
+            };
+            const priorityColors = {
+              Low: "bg-green-100 text-green-600",
+              Medium: "bg-yellow-100 text-yellow-600",
+              High: "bg-red-100 text-red-600"
+            };
+            const card = $(`
+              <div class="taskCard bg-white dark:bg-gray-700 rounded-2xl shadow-md p-4 flex items-center justify-between transform transition hover:scale-[1.02]">
+                <div>
+                  <h3 class="text-lg font-semibold ${task.completed ? 'line-through text-gray-400' : ''}">${task.title}</h3>
+                  <p class="text-sm text-gray-500">📅 ${task.dueDate}</p>
+                  <div class="flex gap-2 mt-2">
+                    <span class="px-2 py-1 text-xs rounded-full ${badgeColors[task.category]}">${task.category}</span>
+                    <span class="px-2 py-1 text-xs rounded-full ${priorityColors[task.priority]}">${task.priority}</span>
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  <button class="completeBtn px-3 py-1 rounded-lg ${task.completed ? 'bg-gray-400' : 'bg-green-500 hover:bg-green-600'} text-white transition" data-id="${task.id}">✔</button>
+                  <button class="deleteBtn px-3 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white transition" data-id="${task.id}">✖</button>
+                </div>
+              </div>
+            `).hide().fadeIn(300);
+            $("#taskList").append(card);
+          });
+        }
+        updateProgress();
+      }
+
+      function updateProgress() {
+        let total = tasks.length;
+        let completed = tasks.filter(t => t.completed).length;
+        let percent = total === 0 ? 0 : Math.round((completed / total) * 100);
+        $("#progressBar").css("width", percent + "%");
+        $("#progressText").text(`${completed} of ${total} tasks completed (${percent}%)`);
+        if (total > 0 && completed === total) {
+          confetti();
+        }
+      }
+
+      $(document).on("click", ".completeBtn", function () {
+        const id = $(this).data("id");
+        tasks = tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t);
+        saveTasks();
+        renderTasks();
+      });
+
+      $(document).on("click", ".deleteBtn", function () {
+        const id = $(this).data("id");
+        tasks = tasks.filter(t => t.id !== id);
+        saveTasks();
+        renderTasks();
+      });
+
+      $(".filterBtn").click(function () {
+        $(".filterBtn").removeClass("bg-indigo-500 text-white").addClass("bg-gray-200 dark:bg-gray-700");
+        $(this).removeClass("bg-gray-200 dark:bg-gray-700").addClass("bg-indigo-500 text-white");
+        renderTasks($(this).data("filter"));
+      });
+
+      renderTasks();
+    });
+  </script>
+</body>
+</html>
